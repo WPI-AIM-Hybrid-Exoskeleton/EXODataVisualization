@@ -4,6 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from GaitCore.Core import Point, PointArray
 import csv
+import pandas as pd
+from sklearn import linear_model
+
+
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
 
@@ -46,13 +50,6 @@ if __name__ == '__main__':
     joint_values_dict["knee_torque"] = knee_torque
 
 
-    plt.plot(hip_force_x)
-    plt.show()
-
-    with open("../matlab/joint_dynamics.csv", "w") as outfile:
-            writer = csv.writer(outfile)
-            writer.writerow(list(joint_values_dict.keys()))
-            writer.writerows(zip(*joint_values_dict.values()))
     # array of marks
     femur_side = [markers.get_marker("LFemurSide0"), markers.get_marker("LFemurSide1"),
                   markers.get_marker("LFemurSide2"), markers.get_marker("LFemurSide3")]
@@ -71,9 +68,9 @@ if __name__ == '__main__':
 
 
     tibia_center = [markers.get_marker("LTibiaFront0"), markers.get_marker("LTibiaFront1"),
-                markers.get_marker("LTibiaFront2"), markers.get_marker("LTibiaFront3"),
-                markers.get_marker("LTibiaBack0"), markers.get_marker("LTibiaBack1"),
-                markers.get_marker("LTibiaBack2"), markers.get_marker("LTibiaBack3")]
+                    markers.get_marker("LTibiaFront2"), markers.get_marker("LTibiaFront3"),
+                    markers.get_marker("LTibiaBack0"), markers.get_marker("LTibiaBack1"),
+                    markers.get_marker("LTibiaBack2"), markers.get_marker("LTibiaBack3")]
 
 
     trial_range = len(femur_center[0])
@@ -130,57 +127,37 @@ if __name__ == '__main__':
     average_tibia_human = PointArray.PointArray.from_point_array(average_tibia_human)
 
 
-    x_human = average_femur_human.z
-    x_exo = average_femur_side.z
-    v_human = np.diff(x_human)/0.01
-    v_exo = np.diff(x_exo )/0.01
+    x_human = average_femur_human.x
+    x_exo = average_femur_side.x
+    vx_human = np.diff(x_human)/0.01
+    vx_exo = np.diff(x_exo )/0.01
 
-    d = {}
+    y_human = average_femur_human.y
+    y_exo = average_femur_side.y
+    vy_human = np.diff(y_human)/0.01
+    vy_exo = np.diff(y_exo )/0.01
 
-    d['x_human'] = x_human
-    d["x_exo"] = x_exo
-    d["v_human"] = v_human
-    d["v_exo"] = v_exo
+    my_dict = {}
+    start = 1750
+    end = 1965
+    my_dict["ex"] = -np.asarray(x_exo[start:end]) - np.asarray(x_human[start:end])
+    my_dict["dex"] = -np.asarray(vx_exo[start:end]) - np.asarray(vx_human[start:end])
+    my_dict["fx"] = -np.array(leg.hip.force.x[start:end])
 
-    with open("../matlab/marker_location.csv", "w") as outfile:
-        writer = csv.writer(outfile)
-        writer.writerow(list(d.keys()))
-        writer.writerows(zip(*d.values()))
+    df = pd.DataFrame.from_dict(my_dict)
 
-    t = np.linspace(0, 100, len(average_femur_human))
+    X = df[['ex']]
+    print(X)
+    y = df['fx']
+    regr = linear_model.LinearRegression()
+    regr.fit(X, y)
+    print("Intercept: ", regr.intercept_)
+    print("Coefficients:")
+    print(regr.coef_)
+    print(regr.rank_)
 
-    fig, ax = plt.subplots(3,2)
-    ax[0,0].plot(t, average_femur_human.x, 'b', markersize=1)
-    ax[0,0].plot(t, average_femur_side.x, 'r', markersize=1)
-    ax[1,0].plot(t, average_femur_human.y, 'b', markersize=1)
-    ax[1,0].plot(t, average_femur_side.y, 'r', markersize=1)
-    ax[2,0].plot(t, average_femur_human.z, 'b', markersize=1)
-    ax[2,0].plot(t, average_femur_side.z, 'r', markersize=1)
-
-    ax[0,1].plot(t, average_tibia_human.x, 'b', markersize=1)
-    ax[0,1].plot(t, average_tibia_side.x, 'r', markersize=1)
-    ax[1,1].plot(t, average_tibia_human.y, 'b', markersize=1)
-    ax[1,1].plot(t, average_tibia_side.y, 'r', markersize=1)
-    ax[2,1].plot(t, average_tibia_human.z, 'b', markersize=1)
-    ax[2,1].plot(t, average_tibia_side.z, 'r', markersize=1)
-
-    fig.suptitle('Comparison of the human thigh position and the exoskeleton thigh position', fontsize=16)
-    ax[0,0].set_title("X Thigh Position", fontsize=16)
-    ax[1,0].set_title("Y Thigh Position", fontsize=16)
-    ax[2,0].set_title("Z Thigh Position", fontsize=16)
-
-    ax[0,1].set_title("X Shank Position", fontsize=16)
-    ax[1,1].set_title("Y Shank Position", fontsize=16)
-    ax[2,1].set_title("Z Shank Position", fontsize=16)
-
-
-    ax[0,0].legend(["Human", "Exoskeleton"])
-    ax[0,0].set_ylabel("Position (mm)", fontsize=16)
-    ax[1,0].set_ylabel("Position (mm)", fontsize=16)
-    ax[2,0].set_ylabel("Position (mm)", fontsize=16)
-    ax[2,0].set_xlabel("Trial %", fontsize=16)
-    ax[2,1].set_xlabel("Trial %", fontsize=16)
-
-
+    plt.plot(vx_human[start:end] , hip_force_x[start:end], '.' )
     plt.show()
+
+
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/

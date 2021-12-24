@@ -14,6 +14,14 @@ tf = 1;
 %fit polynomals to the delta equations for interpolation
 t = 1:length(delta_x)   ;
 t2 = linspace(0, tf, length(delta_x));
+hold on
+plot(t2,delta_x)
+plot(t2, delta_xd)
+y0 = [x_human(1);v_human(1)];
+% my_path = ode45(@(t,y) model(t,y, 0.01,0.01, delta_x, delta_xd), t, y0);
+% plot(my_path.y(1,:))
+
+%%
 % poly_x = polyfit(t2, transpose(delta_x),15);
 % poly_v = polyfit(t2,delta_xd,15);
 
@@ -25,13 +33,23 @@ A = []
 b = []
 Aeq = []
 beq = []
-lb = [500;50];
-ub = [8000;5000];
-x0 = [6000,100]; % Initial guess
+lb = [1000;50];
+ub = [8000;500];
+x0 = [5000,80]; % Initial guess
+K = 8000
+B = 100
 
 fnc_obj =  @(x)objective(x, x_human,v_human, delta_x, delta_xd);
 
 % run the optimzation
+%%
+opts = optimoptions('patternsearch','UseCompletePoll',true);
+
+
+tic % Time the solution
+[gains,fval,exitflag,output] = patternsearch(fnc_obj,x0,...
+                                    [],[],[],[],lb,ub,@confun,opts)
+toc
 
 options = optimoptions(@fmincon,'Display','iter','Algorithm','active-set');
 [gains,fval,exitflag,output]  = fmincon(fnc_obj,x0,A,b,Aeq,beq,lb,ub,@confun,options);
@@ -42,7 +60,7 @@ y0 = [x_human(1);v_human(1)];
 
 my_path = ode45(@(t,y) model(t,y, gains(1),gains(2), delta_x, delta_xd), t, y0);
     
-
+plot(my_path.y(1,:))
 % model function
 %function dydt = model(t,y,K,B, poly_x, poly_v)
 % function dydt = model(t,y,K,B, poly_x, poly_v)
@@ -77,7 +95,6 @@ function f = objective(x, x_human,v_human, delta_x, delta_v)
     sol = ode45(@(t,y) model(t,y, K, B, delta_x, delta_v), time_space, x0);
     
     % get the RMSE error
-    tspane2 =  linspace(0,1, length(x_human));
     ts1 = timeseries(sol.y(1,:));
     ts2 = timeseries(transpose(x_human));
     
